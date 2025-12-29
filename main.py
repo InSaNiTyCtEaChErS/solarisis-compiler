@@ -1,52 +1,57 @@
-generic_opcodes = "add sub mul mulh nand or and nor".split()
-special_opcodes = "rec cmp awc swc bra jum key swap".split()
-jump_opcodes = "nop jump je jne jl jg jle jge".split()
-ram_opcodes = "load store push pull call ret dstore dload".split()
-all_opcodes = generic_opcodes+special_opcodes+jump_opcodes+ram_opcodes
+opcodes = "nand or and nor add sub awc swc nop bra be bne bl bg ble bge load store 8load 8store push pull call ret cmp llpi lupi jmp bcc bcs key cmpi  nandi ori andi nori addi subi awci swci nopi brai bei bnei bli bgi blei bgei loadi storei 8loadi 8storei pushi pulli calli reti".split()
+linecount = 0
+
 
 def opcode_checker(opc):
-    if opc in all_opcodes:
-        return(bin(all_opcodes.index(opc)))
+    opc = opc.split()
+    if opcodes.index(opc[0]) != -1:
+        return(format(opcodes.index(opc[0]),"8b")[2:])
     else:
         raise KeyError(f"Invalid opcoce: {opc}")
-def register(reg):
-    return(bin(reg[1:-1]))
-
-def encode(argument):
-    argument.split(" ")
-    token_count = len(argument)
-    opc = argument[0]
-    opcode_binary = (opcode_checker(opc))
-    if "i" in opc:
-        immediate = 1
-    if token_count == 1:  #handle registerless opcodes
-        if opc in "nop ret bra jum":
-            return(f"00000000 000{opcode_binary} 00000000 00000000")
-        else:
-            raise ValueError(f"invalid token in: {argument}")
-    elif token_count == 2:  #handle opcodes with either rs2 or rd
-        rs2 = opc[1]
-        if opc in "call push swap jump je jne jl jg jle jge ": #rs2 opcodes
-            return(f"{bin(rs2)[16:5]}{opcode_binary} 00000{bin(rs2)[4:0]}{immediate}00000")
-        elif opc in "call rec key pull": #rd opcodes
-            return(f"000000000 000{opcode_binary}{register(rs2)}000 00000000")
-        else:
-            raise ValueError(f"invalid token in: {argument}")
-    elif token_count == 3:
-        rs2 = opc[1]
-        rd = opc[2]
-        if opc in "cmp store dstore":
-            return(f"{bin(rs2)[16:5]}{opcode_binary} {bin(rd)[4:0]}00000{immediate}{bin(rs2)[4:0]}")
-        elif opc in "load dload":
-            return(f"{bin(rs2)[16:5]}{opcode_binary} {bin(rd)[4:0]}{bin(rs2)[4:0]}{immediate}00000")
-        else:
-            raise ValueError(f"invalid token in: {argument}")
-    elif token_count == 4:
-        rs1 = opc[1]
-        rs2 = opc[2]
-        rd = opc[3]
-        return(f"{bin(rs2)[16:5]}{opcode_binary} {bin(rd)[4:0]}{bin(rs2)[4:0]}{immediate}{bin(rs1)}")
-    else:
-        raise ValueError(f"invalid number of operands: {argument}")
     
-print(encode("nop r1"))
+def isnumeric(input_):
+    for char in input_:
+        if char not in "0123456789":
+            return False
+    return True
+
+def register(reg):
+    if isnumeric(reg):
+        return(bin(reg)[2:])
+    else:
+        return(bin(reg[1:])[2:])
+    
+def encode(argument):
+    print(f"line == '{argument}'")
+    if argument[0] == "#":
+        return ""
+    if "#" in argument:
+        res = ""
+        for char in argument:
+            if char == "#": break
+            res += char
+    else:
+        res = argument
+    argument = res
+    argument = argument.split(",")
+    opcode = argument[0]
+    opcode_bin = opcode_checker(opcode)
+    argument.append("")
+    argument.append("")
+    argument.append("")
+    if argument[1] == "":   #handles nop, nopi, ret, reti, jmp, bcc, bcs, call, calli
+        return(f"00000000000{opcode_bin[0:4]}0000000000{opcode_bin[5]}00000").strip()
+    elif argument[2] == "":   #handles push, pushi, llpi, lupi, key, all branches, call, calli, pull, pulli
+        if opcode in "pushi bra be bne bl bg ble bge call brai bei bnei bli bgi blei bgei calli":
+            return(f"{register(argument[1])[5:16]}{opcode_bin[0:4]}00000{register(argument[1])[0:4]}{opcode_bin[5]}00000").strip()
+        elif opcode in "pull pulli":
+            return(f"00000000000{opcode_bin[0:4]}{register(argument[1])[0:4]}00000{opcode_bin[5]}00000").strip()
+    elif argument[3] == "":
+        if opcode in "store storei cmp cmpi":
+            return(f"{register(argument[2])[5:16]}{opcode_bin[0:4]}00000{register(argument[2])[0:4]}{opcode_bin[5]}{register(argument[1])[0:4]}").strip()
+        elif opcode in "load loadi":
+            return(f"{register(argument[1])[5:16]}{opcode_bin[0:4]}{register(argument[2])[0:4]}{register(argument[1])[0:4]}{opcode_bin[5]}00000").strip()
+    else:
+        return(f"{register(argument[2])[5:16]}{opcode_bin[0:4]}{register(argument[1])[0:4]}{register(argument[2])[0:4]}{opcode_bin[5]}{register(argument[3])[0:4]} ").strip()
+print(encode("nop #this is a nop"))
+print(encode("addi r1,5,r2"))
